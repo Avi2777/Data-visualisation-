@@ -1,0 +1,68 @@
+stages:
+  - pull
+  - build
+  - push
+  - cleanup
+  - deploy
+
+before_script:
+  - docker login -u "gitlab-ci-token" -p "$CI_BUILD_TOKEN" "$CI_REGISTRY"
+# login in into our gitlab account
+
+pull:
+  stage: pull
+  allow_failure: true
+  only:
+    - master
+  script:
+    - docker pull "$CI_REGISTRY_IMAGE":latest
+#pullin from our latest image
+
+build:
+  stage: build
+  only:
+    - master
+  script:
+    - docker build --tag="$CI_PIPELINE_ID":"$CI_COMMIT_REF_NAME" --cache-from="$CI_REGISTRY_IMAGE":latest .
+# building a temporary image with new names
+
+push image:
+  stage: push
+  only:
+    - master
+    - tags
+  script:
+    - docker tag "$CI_PIPELINE_ID":"$CI_COMMIT_REF_NAME" "$CI_REGISTRY_IMAGE":"$CI_COMMIT_REF_NAME"
+    - docker push "$CI_REGISTRY_IMAGE":"$CI_COMMIT_REF_NAME"
+
+push latest:
+  stage: push
+  only:
+    - master
+  script:
+    - docker tag "$CI_PIPELINE_ID":"$CI_COMMIT_REF_NAME" "$CI_REGISTRY_IMAGE":latest
+    - docker push "$CI_REGISTRY_IMAGE":latest
+#pushing our image after all the checks
+
+cleanup:
+  stage: cleanup
+  when: always
+  only:
+    - master
+  script:
+    - docker rmi -f "$CI_PIPELINE_ID":"$CI_COMMIT_REF_NAME"
+    - docker-compose -p "$CI_PIPELINE_ID" -f docker-compose.ci.yml down --remove-orphans
+    - docker system prune -f -a
+#cleaning up our image
+
+
+deploy:
+  stage: deploy
+  when: manual
+  only:
+    - master
+  script:
+    - docker-compose -f docker-compose.deploy.yml pull
+    - docker-compose -f docker-compose.deploy.yml down --remove-orphans
+#    - docker volume rm data-visualisation_build
+    - docker-compose -f docker-compose.deploy.yml up -d

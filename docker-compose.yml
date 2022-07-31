@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  backend:
+    image: django_final_project:latest
+    ports:
+      - 8000:8000
+    command: "sh /scripts/dev.sh"
+    volumes:
+      - ./backend:/backend
+      - ./scripts:/scripts
+    env_file:
+      - ./env/dev.env
+
+
+  postgres:
+    image: postgres:latest
+    env_file:
+      - ./env/dev.env
+    ports:
+      - 5555:5432
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+
+volumes:
+  postgres_db:
